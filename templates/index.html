@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Heart Attack Risk</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 20px
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto
+        }
+
+        .form-group {
+            margin-bottom: 10px
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box
+        }
+
+        button {
+            padding: 10px 15px;
+            color: white;
+            border: none;
+            cursor: pointer
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            display: none
+        }
+
+        .high-risk {
+            color: red;
+            font-weight: bold
+        }
+
+        .low-risk {
+            color: green;
+            font-weight: bold
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Heart Attack Risk Prediction</h1>
+
+        <form id="predictionForm">
+            <h3>Vital Signs</h3>
+            <div class="form-group">
+                <label>Pulse:</label>
+                <input type="number" name="pulse" value="80">
+            </div>
+            <div class="form-group">
+                <label>Systolic BP:</label>
+                <input type="number" name="systolic.blood.pressure" value="120">
+            </div>
+            <div class="form-group">
+                <label>Diastolic BP:</label>
+                <input type="number" name="diastolic.blood.pressure" value="80">
+            </div>
+
+            <h3>Lab Values</h3>
+            <div class="form-group">
+                <label>Troponin, (pg/mL):</label>
+                <input type="number" name="high.sensitivity.troponin" value="0">
+            </div>
+            <div class="form-group">
+                <label>Myoglobin, (ng/ml):</label>
+                <input type="number" name="myoglobin" value="0">
+            </div>
+
+            <h3>Clinical Assessment</h3>
+            <div class="form-group">
+                <label>NYHA Class:</label>
+                <select id="nyha" name="nyha">
+                    <option value="0" selected>None</option>
+                    <option value="1">Class IV</option>
+                    <option value="2">Class III</option>
+                    <option value="3">Class II</option>
+                    <option value="4">Class I</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Killip Grade:</label>
+                <select id="killip" name="killip">
+                    <option value="0" selected>None</option>
+                    <option value="1">Grade IV</option>
+                    <option value="2">Grade III</option>
+                    <option value="3">Grade II</option>
+                    <option value="4">Grade I</option>
+                </select>
+            </div>
+
+            <h3>Age</h3>
+            <div class="form-group">
+                <label>Age Group:</label>
+                <select id="age" name="age">
+                    <option value="0" selected>None</option>
+                    <option value="1">Under 29</option>
+                    <option value="1">29-38</option>
+                    <option value="1">39-48</option>
+                    <option value="1">49-58</option>
+                    <option value="1">59-68</option>
+                    <option value="1">69-78</option>
+                    <option value="1">79-89</option>
+                    <option value="1">Over 89</option>
+                </select>
+            </div>
+
+            <h3>Symptom Description</h3>
+            <div class="form-group">
+                <label>Describe symptoms:</label>
+<textarea id="symptomText" rows="3"></textarea>
+            </div>
+
+            <div style="margin-top:20px">
+                <button type="button" id="predictBtn" style="background:#4CAF50">Predict</button>
+                <button type="button" id="resetBtn" style="background:#f44336;margin-left:10px">Reset</button>
+                <button type="button" id="highRiskBtn" style="background:#ff9800;margin-left:10px">High Risk Example</button>
+            </div>
+        </form>
+
+        <div id="result" class="result"></div>
+
+        <script>
+            document.getElementById('predictBtn').addEventListener('click', async function () {
+                const form = document.getElementById('predictionForm');
+                const data = {};
+
+                form.querySelectorAll('input[type="number"]').forEach(input => {
+                    data[input.name] = parseFloat(input.value);
+                });
+
+                if (document.getElementById('age').value === "1") {
+                    data['ageCat_(79,89]'] = 1;
+                }
+
+                if (document.getElementById('nyha').value === "1") {
+                    data['NYHA.cardiac.function.classification_IV'] = 1;
+                }
+
+                if (document.getElementById('killip').value === "1") {
+                    data['Killip.grade_IV'] = 1;
+                }
+
+                data['symptom_text'] = document.getElementById('symptomText').value;
+
+                try {
+                    const response = await fetch('/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+
+                    const result = await response.json();
+
+                    const resultDiv = document.getElementById('result');
+                    if (result.error) {
+                        resultDiv.innerHTML = `<p>Error: ${result.error}</p>`;
+                    } else {
+                        const riskClass = result.prediction === 1 ? 'high-risk' : 'low-risk';
+                        resultDiv.innerHTML = `
+                        <h3>Prediction Result</h3>
+                        <p class="${riskClass}">${result.message}</p>
+                        <p>Probability: ${(result.probability * 100).toFixed(2)}%</p>
+                        <p>Adjusted with symptoms: ${(result.adjusted_probability * 100).toFixed(2)}%</p>
+                        <p>${result.symptom_analysis}</p>
+                    `;
+                    }
+
+                    resultDiv.style.display = 'block';
+                } catch (error) {
+                    console.error('Error:', error);
+                    document.getElementById('result').innerHTML = `<p>Error: ${error.message}</p>`;
+                    document.getElementById('result').style.display = 'block';
+                }
+            });
+
+            document.getElementById('resetBtn').addEventListener('click', function () {
+                document.getElementById('predictionForm').reset();
+                document.getElementById('result').style.display = 'none';
+                document.getElementById('symptomText').value = '';
+            });
+
+            document.getElementById('highRiskBtn').addEventListener('click', function () {
+                document.querySelector('input[name="pulse"]').value = 120;
+                document.querySelector('input[name="systolic.blood.pressure"]').value = 190;
+                document.querySelector('input[name="diastolic.blood.pressure"]').value = 110;
+                document.querySelector('input[name="high.sensitivity.troponin"]').value = 5.0;
+                document.getElementById('nyha').value = "1";
+                document.getElementById('killip').value = "1";
+                document.getElementById('age').value = "1";
+                document.getElementById('symptomText').value = "Patient experiencing severe chest pain radiating to left arm, shortness of breath, and cold sweats for the past hour. Also reports nausea and jaw discomfort.";
+            });
+        </script>
+    </div>
+</body>
+</html>
